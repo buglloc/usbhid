@@ -11,6 +11,7 @@ package usbhid
 import (
 	"errors"
 	"fmt"
+	"sync"
 )
 
 // Errors returned from usbhid package may be tested against these errors
@@ -30,6 +31,8 @@ var (
 	ErrSetFeatureReportFailed  = errors.New("set usb hid feature report failed")
 	ErrSetOutputReportFailed   = errors.New("set usb hid output report failed")
 )
+
+var enumerateLock sync.Mutex
 
 // Device is an opaque structure that represents a USB HID device connected
 // to the computer.
@@ -58,22 +61,45 @@ type DeviceFilterFunc func(*Device) bool
 
 // Enumerate lists the USB HID devices connected to the computer, optionally
 // filtered by a DeviceFilterFunc function.
-func Enumerate(f DeviceFilterFunc) ([]*Device, error) {
-	devices, err := enumerate()
+func Enumerate(opts ...EnumerateOption) ([]*Device, error) {
+	var vid, pid uint16
+	var filter DeviceFilterFunc
+	for _, opt := range opts {
+		switch v := opt.(type) {
+		case optionVidFilter:
+			vid = v.vid
+
+		case optionPidFilter:
+			pid = v.pid
+
+		case optionDeviceFilterFunc:
+			filter = v.filter
+
+		default:
+			return nil, fmt.Errorf("unsupported option: %T", opt)
+		}
+	}
+
+	enumerateLock.Lock()
+	devices, err := enumerate(vid, pid)
+	enumerateLock.Unlock()
+
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrDeviceEnumerationFailed, err)
 	}
 
-	if f == nil {
+	if filter == nil {
 		return devices, nil
 	}
 
-	rv := []*Device{}
+	rv := devices[:0]
 	for _, dev := range devices {
-		if f(dev) {
+		if filter(dev) {
 			rv = append(rv, dev)
 		}
 	}
+	clear(devices[len(rv):])
+
 	return rv, nil
 }
 
@@ -83,23 +109,46 @@ func Enumerate(f DeviceFilterFunc) ([]*Device, error) {
 //
 // If the filtering would result in more than one device, or zero devices, an
 // error is returned.
-func Get(f DeviceFilterFunc, open bool, lock bool) (*Device, error) {
-	devices, err := Enumerate(f)
-	if err != nil {
-		return nil, err
+func Get(opts ...GetOption) (*Device, error) {
+	openOpt := optionOpen{
+		open: false,
+		lock: false,
 	}
 
-	if l := len(devices); l == 0 {
+	var enumOpts []EnumerateOption
+	for _, opt := range opts {
+		if v, ok := opt.(EnumerateOption); ok {
+			enumOpts = append(enumOpts, v)
+			continue
+		}
+
+		switch v := opt.(type) {
+		case optionOpen:
+			openOpt = v
+
+		default:
+			return nil, fmt.Errorf("unsupported option: %T", opt)
+		}
+	}
+
+	devices, err := Enumerate(enumOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("enumerate: %w", err)
+	}
+
+	totalDevices := len(devices)
+	if totalDevices == 0 {
 		return nil, ErrNoDeviceFound
-	} else if l > 1 {
+	}
+
+	if totalDevices > 1 {
 		return nil, ErrMoreThanOneDeviceFound
 	}
 
 	d := devices[0]
-
-	if open {
-		if err := d.Open(lock); err != nil {
-			return nil, err
+	if openOpt.open {
+		if err := d.Open(openOpt.lock); err != nil {
+			return nil, fmt.Errorf("open: %w", err)
 		}
 	}
 

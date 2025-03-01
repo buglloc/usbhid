@@ -36,12 +36,14 @@ type (
 		location _CFIndex
 		length   _CFIndex
 	}
-	_CFRunLoopRef     uintptr
-	_CFSetRef         uintptr
-	_CFStringEncoding uint32
-	_CFStringRef      uintptr
-	_CFTimeInterval   float64
-	_CFTypeRef        uintptr
+	_CFRunLoopRef               uintptr
+	_CFSetRef                   uintptr
+	_CFStringEncoding           uint32
+	_CFStringRef                uintptr
+	_CFTimeInterval             float64
+	_CFTypeRef                  uintptr
+	_CFDictionaryKeyCallBacks   struct{}
+	_CFDictionaryValueCallBacks struct{}
 )
 
 type (
@@ -69,6 +71,7 @@ const (
 	kCFAllocatorDefault _CFAllocatorRef = 0
 
 	kCFNumberSInt16Type _CFIndex = 2
+	KCFNumberShortType  _CFIndex = 8
 
 	kCFStringEncodingUTF8 _CFStringEncoding = 0x08000100
 )
@@ -86,9 +89,16 @@ var (
 	_CFStringCreateWithCString func(alloc _CFAllocatorRef, cstr []byte, encoding _CFStringEncoding) _CFStringRef
 	_CFStringGetCString        func(theString _CFStringRef, buffer []byte, encoding _CFStringEncoding) bool
 	_CFStringGetLength         func(theString _CFStringRef) _CFIndex
+	_CFDictionaryCreate        func(allocator _CFAllocatorRef, keys *unsafe.Pointer, values *unsafe.Pointer, numValues _CFIndex, keyCallBacks *_CFDictionaryKeyCallBacks, valueCallBacks *_CFDictionaryValueCallBacks) _CFDictionaryRef
+	_CFNumberCreate            func(allocator _CFAllocatorRef, theType _CFNumberType, valuePtr unsafe.Pointer) _CFNumberRef
 )
 
-var _kCFRunLoopDefaultMode uintptr
+var (
+	_kCFRunLoopDefaultMode uintptr
+
+	_kCFTypeDictionaryKeyCallBacks   uintptr
+	_kCFTypeDictionaryValueCallBacks uintptr
+)
 
 const (
 	kIOHIDOptionsTypeNone        _IOOptionBits = 0
@@ -150,8 +160,20 @@ func init() {
 	purego.RegisterLibFunc(&_CFStringCreateWithCString, cf, "CFStringCreateWithCString")
 	purego.RegisterLibFunc(&_CFStringGetCString, cf, "CFStringGetCString")
 	purego.RegisterLibFunc(&_CFStringGetLength, cf, "CFStringGetLength")
+	purego.RegisterLibFunc(&_CFDictionaryCreate, cf, "CFDictionaryCreate")
+	purego.RegisterLibFunc(&_CFNumberCreate, cf, "CFNumberCreate")
 
 	_kCFRunLoopDefaultMode, err = purego.Dlsym(cf, "kCFRunLoopDefaultMode")
+	if err != nil {
+		panic(err)
+	}
+
+	_kCFTypeDictionaryKeyCallBacks, err = purego.Dlsym(cf, "kCFTypeDictionaryKeyCallBacks")
+	if err != nil {
+		panic(err)
+	}
+
+	_kCFTypeDictionaryValueCallBacks, err = purego.Dlsym(cf, "kCFTypeDictionaryValueCallBacks")
 	if err != nil {
 		panic(err)
 	}
@@ -203,7 +225,7 @@ func cfstringToString(str _CFStringRef) string {
 	return ""
 }
 
-func enumerate() ([]*Device, error) {
+func enumerate(targeVid, targetPid uint16) ([]*Device, error) {
 	sManufacturer := _CFStringCreateWithCString(kCFAllocatorDefault, []byte("Manufacturer"), kCFStringEncodingUTF8)
 	sProduct := _CFStringCreateWithCString(kCFAllocatorDefault, []byte("Product"), kCFStringEncodingUTF8)
 	sProductID := _CFStringCreateWithCString(kCFAllocatorDefault, []byte("ProductID"), kCFStringEncodingUTF8)
@@ -226,7 +248,45 @@ func enumerate() ([]*Device, error) {
 		_CFRelease(_CFTypeRef(sVersionNumber))
 	}()
 
-	_IOHIDManagerSetDeviceMatching(mgr, 0)
+	var filterKeys []_CFStringRef
+	var filterVals []_CFNumberRef
+
+	if targeVid != 0 {
+		vidRef := _CFNumberCreate(kCFAllocatorDefault, KCFNumberShortType, unsafe.Pointer(&targeVid))
+		if vidRef == 0 {
+			return nil, errors.New("create vid filter: CFNumberCreate returned nil")
+		}
+		defer _CFRelease(_CFTypeRef(vidRef))
+
+		filterKeys = append(filterKeys, sVendorID)
+		filterVals = append(filterVals, vidRef)
+	}
+
+	if targetPid != 0 {
+		pidRef := _CFNumberCreate(kCFAllocatorDefault, KCFNumberShortType, unsafe.Pointer(&targetPid))
+		if pidRef == 0 {
+			return nil, errors.New("create pid filter: CFNumberCreate returned nil")
+		}
+		defer _CFRelease(_CFTypeRef(pidRef))
+
+		filterKeys = append(filterKeys, sProductID)
+		filterVals = append(filterVals, pidRef)
+	}
+
+	if len(filterKeys) > 0 {
+		dict := _CFDictionaryCreate(kCFAllocatorDefault,
+			(*unsafe.Pointer)(unsafe.Pointer(&filterKeys[0])),
+			(*unsafe.Pointer)(unsafe.Pointer(&filterVals[0])),
+			_CFIndex(len(filterKeys)), *(**_CFDictionaryKeyCallBacks)(unsafe.Pointer(&_kCFTypeDictionaryKeyCallBacks)), *(**_CFDictionaryValueCallBacks)(unsafe.Pointer(&_kCFTypeDictionaryValueCallBacks)))
+		if dict == 0 {
+			return nil, errors.New("create mathcinf filter: CFDictionaryCreate returned nil")
+		}
+		defer _CFRelease(_CFTypeRef(dict))
+
+		_IOHIDManagerSetDeviceMatching(mgr, dict)
+	} else {
+		_IOHIDManagerSetDeviceMatching(mgr, 0)
+	}
 
 	device_set := _IOHIDManagerCopyDevices(mgr)
 	defer _CFRelease(_CFTypeRef(device_set))
