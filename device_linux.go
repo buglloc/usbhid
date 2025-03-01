@@ -121,7 +121,7 @@ func sysfsReadAsHexUint16(dir string, entry string) (uint16, error) {
 	return uint16(v), err
 }
 
-func enumerate() ([]*Device, error) {
+func enumerate(targetVid, targetPid uint16) ([]*Device, error) {
 	rv := []*Device{}
 
 	if err := filepath.Walk("/sys/bus/usb/devices", func(path string, info os.FileInfo, err error) error {
@@ -138,8 +138,16 @@ func enumerate() ([]*Device, error) {
 			return nil
 		}
 
+		if targetVid != 0 && targetVid != vendorId {
+			return nil
+		}
+
 		productId, err := sysfsReadAsHexUint16(path, "idProduct")
 		if err != nil {
+			return nil
+		}
+
+		if targetPid != 0 && targetPid != productId {
 			return nil
 		}
 

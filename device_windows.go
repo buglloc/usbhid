@@ -247,7 +247,7 @@ func ioctl(fd uintptr, req uint32, in []byte, out []byte) (int, error) {
 	return int(ovl.n), nil
 }
 
-func enumerate() ([]*Device, error) {
+func enumerate(targetVid, targetPid uint16) ([]*Device, error) {
 	guid := _GUID{}
 	if _, err := call(_HidD_GetHidGuid, unsafe.Pointer(&guid)); err != nil {
 		return nil, err
@@ -301,6 +301,14 @@ func enumerate() ([]*Device, error) {
 
 			attr := _HIDD_ATTRIBUTES{}
 			if _, err := call(_HidD_GetAttributes, f, unsafe.Pointer(&attr)); err != nil {
+				return nil
+			}
+
+			if targetVid != 0 && targetVid != attr.vendorID {
+				return nil
+			}
+
+			if targetPid != 0 && targetPid != attr.productID {
 				return nil
 			}
 
