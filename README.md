@@ -1,11 +1,11 @@
 # usbhid
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/rafaelmartins/usbhid.svg)](https://pkg.go.dev/github.com/rafaelmartins/usbhid)
+[![Go Reference](https://pkg.go.dev/badge/github.com/buglloc/usbhid.svg)](https://pkg.go.dev/github.com/buglloc/usbhid)
 
 A pure Go library to interact with USB HID devices. It can enumerate devices, send and receive every type of HID report.
 
 It works on Linux, Mac and Windows.
-
+Based on the original work by Rafael G. Martins: https://github.com/rafaelmartins/usbhid
 
 ## Known issues
 
