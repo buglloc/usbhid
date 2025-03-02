@@ -129,6 +129,10 @@ func enumerate(targetVid, targetPid uint16) ([]*Device, error) {
 			return err
 		}
 
+		if strings.HasPrefix(info.Name(), "usb") {
+			return filepath.SkipAll
+		}
+
 		if info.Mode()&os.ModeSymlink == 0 || strings.Contains(info.Name(), ":") {
 			return nil
 		}
@@ -171,7 +175,7 @@ func enumerate(targetVid, targetPid uint16) ([]*Device, error) {
 			serialNumber = s
 		}
 
-		files, err := filepath.Glob(filepath.Join(path, "*", "*", "hidraw", "hidraw[0-9]*"))
+		files, err := filepath.Glob(filepath.Join(path, "[0-9]*", "*", "hidraw", "hidraw[0-9]*"))
 		if err != nil {
 			return nil
 		}
