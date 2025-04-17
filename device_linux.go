@@ -189,6 +189,7 @@ func enumerate(targetVid, targetPid uint16) ([]*Device, error) {
 
 			d := &Device{
 				path:         filepath.Join("/dev", filepath.Base(f)),
+				location:     filepath.Base(path),
 				vendorId:     vendorId,
 				productId:    productId,
 				version:      version,

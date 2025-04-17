@@ -38,6 +38,7 @@ var enumerateLock sync.Mutex
 // to the computer.
 type Device struct {
 	path         string
+	location     string
 	vendorId     uint16
 	productId    uint16
 	version      uint16
@@ -286,6 +287,11 @@ func (d *Device) GetOutputReportLength() uint16 {
 // GetFeatureReportLength returns the data size of a feature report in bytes.
 func (d *Device) GetFeatureReportLength() uint16 {
 	return d.reportFeatureLength
+}
+
+// Location returns a string representation of the USB HID device location.
+func (d *Device) Location() string {
+	return d.location
 }
 
 // Path returns a string representation of the USB HID device path.

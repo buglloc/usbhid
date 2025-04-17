@@ -17,6 +17,8 @@ func main() {
 
 	for _, device := range devices {
 		fmt.Printf("Device: 0x%04x:0x%04x\n", device.VendorId(), device.ProductId())
+		fmt.Printf("\tPath:          %s\n", device.Path())
+		fmt.Printf("\tLocation:      %s\n", device.Location())
 		fmt.Printf("\tManufacturer:  %s\n", device.Manufacturer())
 		fmt.Printf("\tProduct:       %s\n", device.Product())
 		fmt.Printf("\tSerial Number: %s\n", device.SerialNumber())
