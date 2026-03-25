@@ -6,6 +6,7 @@ package usbhid
 
 import (
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -124,16 +125,16 @@ func sysfsReadAsHexUint16(dir string, entry string) (uint16, error) {
 func enumerate(targetVid, targetPid uint16) ([]*Device, error) {
 	rv := []*Device{}
 
-	if err := filepath.Walk("/sys/bus/usb/devices", func(path string, info os.FileInfo, err error) error {
+	if err := filepath.WalkDir("/sys/bus/usb/devices", func(path string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if strings.HasPrefix(info.Name(), "usb") {
+		if strings.HasPrefix(de.Name(), "usb") {
 			return filepath.SkipAll
 		}
 
-		if info.Mode()&os.ModeSymlink == 0 || strings.Contains(info.Name(), ":") {
+		if de.Type()&os.ModeSymlink == 0 || strings.Contains(de.Name(), ":") {
 			return nil
 		}
 
