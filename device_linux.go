@@ -217,13 +217,17 @@ func (d *Device) open(lock bool) error {
 		return err
 	}
 
-	d.extra.file = f
-
 	if lock {
-		if err := syscall.Flock(int(d.extra.file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == syscall.EWOULDBLOCK {
-			return ErrDeviceLocked
+		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+			f.Close()
+			if err == syscall.EWOULDBLOCK {
+				return ErrDeviceLocked
+			}
+			return err
 		}
 	}
+
+	d.extra.file = f
 	return nil
 }
 
@@ -253,6 +257,10 @@ func (d *Device) getInputReport() (byte, []byte, error) {
 		return 0, nil, err
 	}
 
+	if n == 0 {
+		return 0, []byte{}, nil
+	}
+
 	if d.reportWithId {
 		return buf[0], buf[1:n], nil
 	}
@@ -274,6 +282,10 @@ func (d *Device) getFeatureReport(reportId byte) ([]byte, error) {
 	rv, err := ioctl(d.extra.file.Fd(), uint(ioc(iocWrite|iocRead, 'H', 0x07, uint16(len(buf)))), uintptr(unsafe.Pointer(&buf[0])))
 	if err != nil {
 		return nil, err
+	}
+
+	if rv < 1 {
+		return []byte{}, nil
 	}
 
 	start := 0

@@ -494,6 +494,10 @@ func (d *Device) getInputReport() (byte, []byte, error) {
 			return 0, nil, result.err
 		}
 
+		if len(result.buf) == 0 {
+			return 0, []byte{}, nil
+		}
+
 		if d.reportWithId {
 			return result.buf[0], result.buf[1:], nil
 		}
@@ -518,6 +522,7 @@ func resultCallback(context unsafe.Pointer, result _IOReturn, sender uintptr, re
 	if result != kIOReturnSuccess {
 		ctx.len = 0
 		ctx.err <- fmt.Errorf("0x%08x", result)
+		return
 	}
 
 	ctx.len = reportLength
@@ -571,6 +576,10 @@ func (d *Device) getFeatureReport(reportId byte) ([]byte, error) {
 
 	if err := <-ctx.err; err != nil {
 		return nil, err
+	}
+
+	if ctx.len < 1 {
+		return []byte{}, nil
 	}
 
 	if d.reportWithId {

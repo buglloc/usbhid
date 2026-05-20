@@ -64,6 +64,13 @@ func hidParseReportDescriptor(descriptor []byte) (uint16, uint16, uint16, uint16
 			size = 4
 		}
 
+		// guard against truncated/corrupt descriptors: the data bytes that
+		// follow the item header must fit, otherwise hidValue would read past
+		// the end of the slice and panic.
+		if i+int(size) > len(descriptor) {
+			break
+		}
+
 		switch typ {
 		case 0: // main
 			switch tag {
