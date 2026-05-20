@@ -344,9 +344,18 @@ func enumerate(targetVid, targetPid uint16) ([]*Device, error) {
 
 			rv.usagePage = caps.usagePage
 			rv.usage = caps.usage
-			rv.reportInputLength = caps.inputReportByteLength - 1
-			rv.reportOutputLength = caps.outputReportByteLength - 1
-			rv.reportFeatureLength = caps.featureReportByteLength - 1
+			// the byte length reported by Windows includes the report id byte;
+			// guard against a zero length to avoid uint16 underflow to 65535
+			// (which would then overflow back to 0 in make([]byte, len+1)).
+			if caps.inputReportByteLength > 0 {
+				rv.reportInputLength = caps.inputReportByteLength - 1
+			}
+			if caps.outputReportByteLength > 0 {
+				rv.reportOutputLength = caps.outputReportByteLength - 1
+			}
+			if caps.featureReportByteLength > 0 {
+				rv.reportFeatureLength = caps.featureReportByteLength - 1
+			}
 			rv.reportWithId = true
 			return rv
 		}()
@@ -372,7 +381,11 @@ func (d *Device) open(lock bool) error {
 	d.extra.file = f
 
 	if lock {
-		return d.lock()
+		if err := d.lock(); err != nil {
+			call(_CloseHandle, f)
+			d.extra.file = null
+			return err
+		}
 	}
 	return nil
 }
@@ -449,6 +462,9 @@ func (d *Device) getInputReport() (byte, []byte, error) {
 	if _, err := call(_ReadFile, d.extra.file, unsafe.Pointer(&buf[0]), len(buf), 0, &ovl); err != nil {
 		return 0, nil, err
 	}
+	if ovl.n == 0 {
+		return 0, []byte{}, nil
+	}
 	return buf[0], buf[1:ovl.n], nil
 }
 
@@ -472,6 +488,9 @@ func (d *Device) getFeatureReport(reportId byte) ([]byte, error) {
 	n, err := ioctl(d.extra.file, _IOCTL_HID_GET_FEATURE, nil, buf)
 	if err != nil {
 		return nil, err
+	}
+	if n < 1 {
+		return []byte{}, nil
 	}
 	return buf[1:n], nil
 }

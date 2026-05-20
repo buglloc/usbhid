@@ -130,6 +130,38 @@ var (
 	}
 )
 
+func TestParseTruncated(t *testing.T) {
+	// a corrupt/truncated descriptor where the trailing item header announces
+	// data bytes that are not present must not panic with index out of range.
+	for n := range len(b8Mega) {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("panic on descriptor truncated to %d bytes: %v", n, r)
+				}
+			}()
+			hidParseReportDescriptor(b8Mega[:n])
+		}()
+	}
+
+	// a lone item header claiming a 4-byte payload with nothing after it.
+	for _, descr := range [][]byte{
+		{0x06},             // usage page, size=2, no data
+		{0x07},             // report size, size=3 -> 4, no data
+		{0x96, 0x01},       // report count, size=2, only 1 byte
+		{0x05, 0x0C, 0x07}, // valid item then truncated report size
+	} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("panic on descriptor %v: %v", descr, r)
+				}
+			}()
+			hidParseReportDescriptor(descr)
+		}()
+	}
+}
+
 func TestParse(t *testing.T) {
 	for i, tt := range args {
 		rusagePage, rusage, sinput, soutput, sfeature, withId := hidParseReportDescriptor(tt.descr)
