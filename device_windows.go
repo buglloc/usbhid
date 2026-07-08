@@ -13,6 +13,8 @@ import (
 	"path"
 	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 type overlapped struct {
@@ -103,7 +105,7 @@ const (
 )
 
 var (
-	kernel32             = syscall.NewLazyDLL("kernel32.dll")
+	kernel32             = windows.NewLazySystemDLL("kernel32.dll")
 	_CreateEventW        = kernel32.NewProc("CreateEventW")
 	_CreateFileW         = kernel32.NewProc("CreateFileW")
 	_CloseHandle         = kernel32.NewProc("CloseHandle")
@@ -120,7 +122,7 @@ const (
 )
 
 var (
-	setupapi                          = syscall.NewLazyDLL("setupapi.dll")
+	setupapi                          = windows.NewLazySystemDLL("setupapi.dll")
 	_SetupDiDestroyDeviceInfoList     = setupapi.NewProc("SetupDiDestroyDeviceInfoList")
 	_SetupDiEnumDeviceInterfaces      = setupapi.NewProc("SetupDiEnumDeviceInterfaces")
 	_SetupDiGetClassDevsW             = setupapi.NewProc("SetupDiGetClassDevsW")
@@ -132,7 +134,7 @@ const (
 )
 
 var (
-	hid                         = syscall.NewLazyDLL("hid.dll")
+	hid                         = windows.NewLazySystemDLL("hid.dll")
 	_HidD_FreePreparsedData     = hid.NewProc("HidD_FreePreparsedData")
 	_HidD_GetAttributes         = hid.NewProc("HidD_GetAttributes")
 	_HidD_GetHidGuid            = hid.NewProc("HidD_GetHidGuid")
@@ -143,7 +145,7 @@ var (
 	_HidP_GetCaps               = hid.NewProc("HidP_GetCaps")
 )
 
-func call(p *syscall.LazyProc, args ...any) (uintptr, error) {
+func call(p *windows.LazyProc, args ...any) (uintptr, error) {
 	var ovl *overlapped
 
 	v := make([]uintptr, len(args))
