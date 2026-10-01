@@ -167,10 +167,10 @@ func TestParse(t *testing.T) {
 		rusagePage, rusage, sinput, soutput, sfeature, withId := hidParseReportDescriptor(tt.descr)
 
 		if rusagePage != tt.rusagePage {
-			t.Errorf("%d: bad usage page: got %q, want %q", i, rusagePage, tt.rusagePage)
+			t.Errorf("%d: bad usage page: got %#x, want %#x", i, rusagePage, tt.rusagePage)
 		}
 		if rusage != tt.rusage {
-			t.Errorf("%d: bad usage: got %q, want %q", i, rusage, tt.rusage)
+			t.Errorf("%d: bad usage: got %#x, want %#x", i, rusage, tt.rusage)
 		}
 		if sinput != tt.sinput {
 			t.Errorf("%d: bad size input: got %d, want %d", i, sinput, tt.sinput)
